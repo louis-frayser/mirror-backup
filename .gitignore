@@ -3,4 +3,4 @@ jcl
 mirror-backup.sh
 nohup.out
 typescript
-#*
+\#*
