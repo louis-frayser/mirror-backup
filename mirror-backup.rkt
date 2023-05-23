@@ -5,8 +5,13 @@
 (require (only-in racket/os gethostname))
 (require (only-in racket-hacks strings->string get-submounts))
 (require file/glob)
+;;; ===========================================================================================
 (define (string-quote s)
   (format "~s" s))
+
+(define (basename fnamestr)
+  (last (string-split fnamestr "/")))
+
 ;;; ============================================================================================
 (define %excludes
   '(".Trash*" "*~"
@@ -43,10 +48,12 @@
 ;;;    this is security for cases requring an encrypting destinatin directory.
 ;;; 5. Sensitive? => log to a encrypted directory.
 (define %backup-plans
-  (let* ([vsrcs1 (map (curry string-append "/volumes/") '("av" "work"))]
+  (let* ((dir-with-submounts (lambda(dr)(cons dr (get-submounts dr))))
+         [arc "/volumes/arc/archive"]
+         [arcs (append (get-submounts arc) '("/volumes/arc/dskimgs"))]
+         [vsrcs1 (map (curry string-append "/volumes/") '("av" "work"))]
          [osrcs '("/srv" "/srv/shared")]
-         [arcsrcs (append vsrcs1 osrcs)]
-         [crypt-srcs (map path->string (glob "/volumes/crypt/the_crypt/*"))])
+         [arcsrcs (append arcs vsrcs1 osrcs)])
 
     (list (backup-plan #:name "encdocs"
                        #:src-paths '("/volumes/crypt/encdocs")
@@ -64,7 +71,7 @@
                        #:merge-on-target? #t
                        #:need-mounted-target? #f)
           (backup-plan #:name (string-append "by-host/" (gethostname))
-                       #:src-paths '("/etc" "/var/logs" "/root" "/home")
+                       #:src-paths '("/etc" "/var/log" "/root" "/home")
                        #:ignore-paths '()
                        #:merge-on-target? #f
                        #:need-mounted-target? #f)
@@ -79,7 +86,7 @@
                        #:merge-on-target? #f
                        #:need-mounted-target? #f)
           (backup-plan #:name "the_crypt"
-                       #:src-paths crypt-srcs
+                       #:src-paths (dir-with-submounts "/volumes/crypt/the_crypt")
                        #:ignore-paths '()
                        #:merge-on-target? #f
                        #:need-mounted-target? #t))))
@@ -103,12 +110,14 @@ JCL
             (if (backup-plan-need-mounted-target? a-plan) 'need-mount 'false)
             srcs-str
             dest-subdir)))
+
+(define %srcs-alist
+  (map (lambda (r) (cons (backup-plan-name r) (backup-plan-src-paths r))) %backup-plans))
+
 ;; ................................................................................................
 ;;; Check for dups
 ((lambda ()
-   (define srcs-alist
-     (map (lambda (r) (cons (backup-plan-name r) (backup-plan-src-paths r))) %backup-plans))
-   (define srcs-pairs (combinations srcs-alist 2))
+   (define srcs-pairs (combinations %srcs-alist 2))
    (define (lsets-intersect? src-pr)
      (let ([sp1 (car src-pr)] [sp2 (cadr src-pr)])
        (and (cons? (lset-intersection string=? (cdr sp1) (cdr sp2))) (cons (car sp1) (car sp2)))))
@@ -120,6 +129,28 @@ JCL
      (error 'user-error:backup-plans
             (format "Each of following plan pairs duplicate some source paths between them: ~s"
                     dups)))))
+;; ................................................................................................
+;;; Verify that each mentioned path is present
+(define (get-missing-dirs-app-accum src-assoc missing-assocs)
+  (define (excluded? dir)
+    (member (basename dir) %excludes))
+  
+  (define (available-for-backup? dir)
+    (or (excluded? dir) (directory-exists? dir)))
+  
+  (let* ((assoc-dirs-out
+          (foldl (lambda(dir mdirs)
+                   (if (available-for-backup? dir) mdirs (cons dir mdirs)))
+                 '()
+                 (cdr src-assoc))))
+    (if (null? assoc-dirs-out)
+        missing-assocs
+        (cons (cons (car src-assoc) assoc-dirs-out) missing-assocs))))
+
+(define unviable-subplans (foldr get-missing-dirs-app-accum '() %srcs-alist))
+(when (not (null? unviable-subplans))
+  (error 'noviable-plans "The following (plan files) sets aren't available"))
+
 ;; ................................................................................................
 
 (begin
@@ -134,7 +165,7 @@ prep_dir(){
    if test "$2" = need-mount
    then mountpoint -q "$1" || mount "$1"
    fi
-}
+}~n
 RsyncFlags=(~a)
 HEADER
       %rsync-flags))
@@ -142,6 +173,7 @@ HEADER
 
   (with-output-to-file "mirror-backup.sh" writer #:exists 'replace #:permissions #o750)
   (displayln (file->string "mirror-backup.sh") (current-error-port)))
+
 
 (eprintf "# Run the backup script was written to ~amirror-backup.sh to effect the actual backup.\n"
          (current-directory))
