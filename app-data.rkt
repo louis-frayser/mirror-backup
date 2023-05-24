@@ -1,8 +1,8 @@
 #lang debug racket
 (provide %excludes %rsync-exclude-flags %default-rsync-flags %rsync-flags
          backup-plan get-backup-plans 
-         gen-plan-backup srcs-alist)
-;(require (only-in srfi/1 lset-intersection))
+         gen-plan-backup srcs-alist check-for-dup-srcs? check-for-dup-srcs?)
+(require (only-in srfi/1 lset-intersection))
 (require rebellion/type/record)
 #;(require (only-in racket/os gethostname))
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
@@ -126,11 +126,12 @@ JCL
 (define (srcs-alist backup-plans)
   (map (lambda (r) (cons (backup-plan-name r) (backup-plan-src-paths r)))
        backup-plans))
-#|
+
 ;; .............................................................................
+(define check-for-dup-srcs?
 ;;; Check for dups
-((lambda ()
-   (define srcs-pairs (combinations %srcs-alist 2))
+(lambda (srcs-alist)
+   (define srcs-pairs (combinations srcs-alist 2))
    (define (lsets-intersect? src-pr)
      (let ([sp1 (car src-pr)] [sp2 (cadr src-pr)])
        (and (cons? (lset-intersection string=? (cdr sp1) (cdr sp2)))
@@ -139,12 +140,14 @@ JCL
    (define r (filter lsets-intersect? srcs-pairs))
 
    (define dups (map (lambda (pr) (map car pr)) r))
-   (when (pair? dups)
+   (if (pair? dups)
      (error
       'user-error:backup-plans
       (format
        "Each of following plan pairs duplicate some source paths between them: ~s"
-       dups)))))
+       dups))
+     #f)))
+#|
 ;; .............................................................................
 ;;; Verify that each mentioned path is present
 (define (get-missing-dirs-app-accum src-assoc missing-assocs)

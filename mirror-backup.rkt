@@ -1,6 +1,6 @@
 #!/usr/bin/racket
 #lang debug racket
-(require (only-in srfi/1 lset-intersection))
+;(require (only-in srfi/1 lset-intersection))
 ;(require rebellion/type/record)
 (require (only-in racket/os gethostname))
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
@@ -10,7 +10,8 @@
 (require (only-in
           "app-data.rkt"
           %excludes %rsync-exclude-flags %default-rsync-flags %rsync-flags
-          backup-plan  get-backup-plans gen-plan-backup srcs-alist))
+          backup-plan  get-backup-plans gen-plan-backup srcs-alist
+          check-for-dup-srcs? ))
 ;;; ============================================================================
 
 ;;; ============================================================================
@@ -39,22 +40,13 @@
 (define %srcs-alist (srcs-alist %backup-plans))
 ;; .............................................................................
 ;;; Check for dups
-((lambda ()
-   (define srcs-pairs (combinations %srcs-alist 2))
-   (define (lsets-intersect? src-pr)
-     (let ([sp1 (car src-pr)] [sp2 (cadr src-pr)])
-       (and (cons? (lset-intersection string=? (cdr sp1) (cdr sp2)))
-            (cons (car sp1) (car sp2)))))
-   (map lsets-intersect? srcs-pairs)
-   (define r (filter lsets-intersect? srcs-pairs))
-
-   (define dups (map (lambda (pr) (map car pr)) r))
-   (when (pair? dups)
-     (error
-      'user-error:backup-plans
-      (format
-       "Each of following plan pairs duplicate some source paths between them: ~s"
-       dups)))))
+(let ((dups? (check-for-dup-srcs? %srcs-alist)))
+  (when dups?
+  (error
+   'user-error:backup-plans
+   (format
+    "Each of following plan pairs duplicate some source paths between them: ~s"
+    dups?))))
 ;; .............................................................................
 ;;; Verify that each mentioned path is present
 (define (get-missing-dirs-app-accum src-assoc missing-assocs)
