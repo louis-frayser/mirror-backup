@@ -12,7 +12,6 @@
          check-for-dup-srcs?)
 (require (only-in srfi/1 lset-intersection))
 (require rebellion/type/record)
-#;(require (only-in racket/os gethostname))
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
                   #;racket-hacks
                   strings->string
@@ -53,8 +52,8 @@
   (string-append %default-rsync-flags " -x -v " %rsync-exclude-flags))
 
 (define-record-type
-  backup-plan
-  (name src-paths ignore-paths merge-on-target? need-mounted-target?))
+ backup-plan
+ (name src-paths ignore-paths merge-on-target? need-mounted-target?))
 
 ;;; Semantics
 ;;; 1. It's implied that mountoints are not traversed
@@ -84,13 +83,12 @@
                      #:ignore-paths '()
                      #:merge-on-target? #t
                      #:need-mounted-target? #f)
-        (backup-plan
-         #:name (string-append "by-host/" hostname)
-         #:src-paths
-         '("/etc" "/var/log" "/root") ; /home is /z/USERDATA & redundant
-         #:ignore-paths '()
-         #:merge-on-target? #f
-         #:need-mounted-target? #f)
+        (backup-plan #:name (string-append "by-host/" hostname)
+                     ;; /home is /z/USERDATA & redundant
+                     #:src-paths '("/etc" "/var/log" "/root")
+                     #:ignore-paths '()
+                     #:merge-on-target? #f
+                     #:need-mounted-target? #f)
         (backup-plan #:name "archives"
                      #:src-paths arcsrcs
                      #:ignore-paths '()
@@ -125,9 +123,7 @@
     (define r (filter lsets-intersect? srcs-pairs))
 
     (define dups (map (lambda (pr) (map car pr)) r))
-    (if (pair? dups)
-        dups
-        #f)))
+    (if (pair? dups) dups #f)))
 
 ;; .............................................................................
 (define (srcs-alist backup-plans)

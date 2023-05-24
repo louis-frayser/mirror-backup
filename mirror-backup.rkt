@@ -1,16 +1,11 @@
 #!/usr/bin/racket
 #lang debug racket
-;(require (only-in srfi/1 lset-intersection))
-;(require rebellion/type/record)
 (require (only-in racket/os gethostname))
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
-                  #;racket-hacks
-                  #;strings->string
                   get-submounts
                   ~0
                   basename
                   tstamp))
-;(require file/glob)
 (require (only-in "app-data.rkt"
                   %excludes
                   %rsync-exclude-flags
@@ -22,9 +17,6 @@
                   check-for-dup-srcs?
                   gen-script))
 ;;; ============================================================================
-
-;;; ============================================================================
-
 ;;; Semantics
 ;;; 1. It's implied that mountoints are not traversed
 ;;; 2. The #:name is use to create a top-level directory in the destination
