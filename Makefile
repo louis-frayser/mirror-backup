@@ -1,7 +1,7 @@
 Attic=/var/tmp/mirror-backup/Attic
 
 
-default: clean
+default:
 	@echo Targets...
 	@egrep : Makefile
 
@@ -20,3 +20,5 @@ run mirror-backup.sh:
 test:   mirror-backup.sh
 	script -c "sh -x $<" "test.log"
 
+format fmt:
+	raco fmt -i --width 78 *.rkt
