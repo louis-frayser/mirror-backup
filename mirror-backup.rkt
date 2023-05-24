@@ -5,13 +5,22 @@
 (require (only-in racket/os gethostname))
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
                   #;racket-hacks
-                  #;strings->string get-submounts ~0 basename tstamp))
+                  #;strings->string
+                  get-submounts
+                  ~0
+                  basename
+                  tstamp))
 ;(require file/glob)
-(require (only-in
-          "app-data.rkt"
-          %excludes %rsync-exclude-flags %default-rsync-flags %rsync-flags
-          backup-plan  get-backup-plans gen-plan-backup srcs-alist
-          check-for-dup-srcs? ))
+(require (only-in "app-data.rkt"
+                  %excludes
+                  %rsync-exclude-flags
+                  %default-rsync-flags
+                  %rsync-flags
+                  backup-plan
+                  get-backup-plans
+                  srcs-alist
+                  check-for-dup-srcs?
+                  gen-script))
 ;;; ============================================================================
 
 ;;; ============================================================================
@@ -31,7 +40,7 @@
     (get-backup-plans
      #:arcsrcs arcsrcs
      #:expsrcs (dir-with-submounts "/export") ; includes /export/home
-     #:hostname (gethostname)    
+     #:hostname (gethostname)
      #:srvsrvs (dir-with-submounts "/srv")
      #:crysrvs (dir-with-submounts "/volumes/crypt/the_crypt"))))
 
@@ -40,13 +49,13 @@
 (define %srcs-alist (srcs-alist %backup-plans))
 ;; .............................................................................
 ;;; Check for dups
-(let ((dups? (check-for-dup-srcs? %srcs-alist)))
+(let ([dups? (check-for-dup-srcs? %srcs-alist)])
   (when dups?
-  (error
-   'user-error:backup-plans
-   (format
-    "Each of following plan pairs duplicate some source paths between them: ~s"
-    dups?))))
+    (error
+     'user-error:backup-plans
+     (format
+      "Each of following plan pairs duplicate some source paths between them: ~s"
+      dups?))))
 ;; .............................................................................
 ;;; Verify that each mentioned path is present
 (define (get-missing-dirs-app-accum src-assoc missing-assocs)
@@ -70,34 +79,16 @@
   (error 'non-viable-plans
          "The following (plan files) sets aren't available '~a'"
          unviable-subplans))
-
 ;; .............................................................................
+;;; Write resultant script to file...
+(with-output-to-file "mirror-backup.sh"
+                     (lambda () (display (gen-script %backup-plans)))
+                     #:exists 'replace
+                     #:permissions #o750)
 
-(begin
-  (define (writer)
-    (displayln
-     (format
-      #<<HEADER
-#! /bin/sh
-
-prep_dir(){
-   test -d "$1" || mkdir -p "$1"
-   if test "$2" = need-mount
-   then mountpoint -q "$1" || mount "$1"
-   fi
-}~n
-RsyncFlags=(~a)
-HEADER
-      %rsync-flags))
-    (for-each back-it-up! %backup-plans))
-  (define (back-it-up! a-plan) (displayln (gen-plan-backup a-plan)))
-
-  (with-output-to-file "mirror-backup.sh"
-    writer
-    #:exists 'replace
-    #:permissions #o750)
-  (displayln (file->string "mirror-backup.sh") (current-error-port)))
+;; Show the result from file...
+(displayln (file->string "mirror-backup.sh") (current-error-port))
 
 (eprintf
- "# Run the backup script was written to ~amirror-backup.sh to effect the actual backup.\n"
+ "# Run the backup script that was written to ~amirror-backup.sh to effect the actual backup.\n"
  (current-directory))

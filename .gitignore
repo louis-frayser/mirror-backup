@@ -4,3 +4,7 @@ mirror-backup.sh
 nohup.out
 typescript
 \#*
+compiled/
+mirror-backup
+re-run.log
+test.log

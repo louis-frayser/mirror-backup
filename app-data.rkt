@@ -1,13 +1,25 @@
 #lang debug racket
-(provide %excludes %rsync-exclude-flags %default-rsync-flags %rsync-flags
-         backup-plan get-backup-plans 
-         gen-plan-backup srcs-alist check-for-dup-srcs? check-for-dup-srcs?)
+(provide %excludes
+         %rsync-exclude-flags
+         %default-rsync-flags
+         %rsync-flags
+         backup-plan
+         get-backup-plans
+         gen-script
+         gen-script
+         srcs-alist
+         check-for-dup-srcs?
+         check-for-dup-srcs?)
 (require (only-in srfi/1 lset-intersection))
 (require rebellion/type/record)
 #;(require (only-in racket/os gethostname))
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
-                    #;racket-hacks
-                    strings->string #;get-submounts #;~0 #;basename #;tstamp))
+                  #;racket-hacks
+                  strings->string
+                  #;get-submounts
+                  #;~0
+                  #;basename
+                  #;tstamp))
 ;(require file/glob)
 ;;; ============================================================================
 ;(define get-plans get-backup-plans)
@@ -52,27 +64,26 @@
 ;;; 4. If need-mounted-target? is true the target must be a mountpoint
 ;;;    this is security for cases requring an encrypting destinatin directory.
 ;;; 5. Sensitive? => log to a encrypted directory.
-(define (get-backup-plans
-         #:arcsrcs arcsrcs
-         #:expsrcs expsrcs
-         #:hostname hostname
-         #:srvsrvs srvsrcs
-         #:crysrvs crysrcs)
+(define (get-backup-plans #:arcsrcs arcsrcs
+                          #:expsrcs expsrcs
+                          #:hostname hostname
+                          #:srvsrvs srvsrcs
+                          #:crysrvs crysrcs)
   (list (backup-plan #:name "encdocs"
-                       #:src-paths '("/volumes/crypt/encdocs")
-                       #:ignore-paths '()
-                       #:merge-on-target? #t
-                       #:need-mounted-target? #t)
+                     #:src-paths '("/volumes/crypt/encdocs")
+                     #:ignore-paths '()
+                     #:merge-on-target? #t
+                     #:need-mounted-target? #t)
         (backup-plan #:name "export"
-                       #:src-paths expsrcs ; includes /export/home
-                       #:ignore-paths '()
-                       #:merge-on-target? #f
-                       #:need-mounted-target? #t)
+                     #:src-paths expsrcs ; includes /export/home
+                     #:ignore-paths '()
+                     #:merge-on-target? #f
+                     #:need-mounted-target? #t)
         (backup-plan #:name "lucho"
-                       #:src-paths '("/usr/lucho")
-                       #:ignore-paths '()
-                       #:merge-on-target? #t
-                       #:need-mounted-target? #f)
+                     #:src-paths '("/usr/lucho")
+                     #:ignore-paths '()
+                     #:merge-on-target? #t
+                     #:need-mounted-target? #f)
         (backup-plan
          #:name (string-append "by-host/" hostname)
          #:src-paths
@@ -81,104 +92,76 @@
          #:merge-on-target? #f
          #:need-mounted-target? #f)
         (backup-plan #:name "archives"
-                       #:src-paths arcsrcs
-                       #:ignore-paths '()
-                       #:merge-on-target? #f
-                       #:need-mounted-target? #f)
+                     #:src-paths arcsrcs
+                     #:ignore-paths '()
+                     #:merge-on-target? #f
+                     #:need-mounted-target? #f)
         (backup-plan #:name "cache"
-                       #:src-paths '("/var/db/repos")
-                       #:ignore-paths '()
-                       #:merge-on-target? #f
-                       #:need-mounted-target? #f)
+                     #:src-paths '("/var/db/repos")
+                     #:ignore-paths '()
+                     #:merge-on-target? #f
+                     #:need-mounted-target? #f)
         (backup-plan #:name "srv"
-                       #:src-paths srvsrcs
-                       #:ignore-paths '()
-                       #:merge-on-target? #f
-                       #:need-mounted-target? #f)
-        (backup-plan
-         #:name "the_crypt"
-         #:src-paths crysrcs
-         #:ignore-paths '()
-         #:merge-on-target? #f
-         #:need-mounted-target? #t)))
+                     #:src-paths srvsrcs
+                     #:ignore-paths '()
+                     #:merge-on-target? #f
+                     #:need-mounted-target? #f)
+        (backup-plan #:name "the_crypt"
+                     #:src-paths crysrcs
+                     #:ignore-paths '()
+                     #:merge-on-target? #f
+                     #:need-mounted-target? #t)))
 
 ;; .............................................................................
-(define (gen-plan-backup a-plan)
-  (let* ([fn (if (backup-plan-merge-on-target? a-plan)
-                 (lambda (p) (string-append p "/"))
-                 (lambda (p) p))]
-         [srcs-str (strings->string (map fn (backup-plan-src-paths a-plan)))]
-         [dest-dir "/volumes/arc/mirror"]
-         [dest-subdir
-          (string-append dest-dir "/" (backup-plan-name a-plan) "/")])
-    (format
-     #<<JCL
-if prep_dir  ~s  ~s
-then rsync "${RsyncFlags[@]}" ~a ~a
-fi
-echo
-JCL
-     dest-subdir
-     (if (backup-plan-need-mounted-target? a-plan) 'need-mount 'false)
-     srcs-str
-     dest-subdir)))
+(define check-for-dup-srcs?
+  ;;; Check for dups
+  (lambda (srcs-alist)
+    (define srcs-pairs (combinations srcs-alist 2))
+    (define (lsets-intersect? src-pr)
+      (let ([sp1 (car src-pr)] [sp2 (cadr src-pr)])
+        (and (cons? (lset-intersection string=? (cdr sp1) (cdr sp2)))
+             (cons (car sp1) (car sp2)))))
+    (map lsets-intersect? srcs-pairs)
+    (define r (filter lsets-intersect? srcs-pairs))
 
+    (define dups (map (lambda (pr) (map car pr)) r))
+    (if (pair? dups)
+        dups
+        #f)))
+
+;; .............................................................................
 (define (srcs-alist backup-plans)
   (map (lambda (r) (cons (backup-plan-name r) (backup-plan-src-paths r)))
        backup-plans))
 
 ;; .............................................................................
-(define check-for-dup-srcs?
-;;; Check for dups
-(lambda (srcs-alist)
-   (define srcs-pairs (combinations srcs-alist 2))
-   (define (lsets-intersect? src-pr)
-     (let ([sp1 (car src-pr)] [sp2 (cadr src-pr)])
-       (and (cons? (lset-intersection string=? (cdr sp1) (cdr sp2)))
-            (cons (car sp1) (car sp2)))))
-   (map lsets-intersect? srcs-pairs)
-   (define r (filter lsets-intersect? srcs-pairs))
 
-   (define dups (map (lambda (pr) (map car pr)) r))
-   (if (pair? dups)
-     (error
-      'user-error:backup-plans
+(define (gen-script backup-plans)
+  (define (gen-plan-backup a-plan)
+    a-plan
+    (let* ([fn (if (backup-plan-merge-on-target? a-plan)
+                   (lambda (p) (string-append p "/"))
+                   (lambda (p) p))]
+           [srcs-str (strings->string
+                      (map fn (backup-plan-src-paths a-plan)))]
+           [dest-dir "/volumes/arc/mirror"]
+           [dest-subdir
+            (string-append dest-dir "/" (backup-plan-name a-plan) "/")])
       (format
-       "Each of following plan pairs duplicate some source paths between them: ~s"
-       dups))
-     #f)))
-#|
-;; .............................................................................
-;;; Verify that each mentioned path is present
-(define (get-missing-dirs-app-accum src-assoc missing-assocs)
-  (define (excluded? dir)
-    (member (basename dir) %excludes))
+       #<<JCL
+if prep_dir  ~s  ~s
+then rsync "${RsyncFlags[@]}" ~a ~a
+fi
+echo~n~n
+JCL
+       dest-subdir
+       (if (backup-plan-need-mounted-target? a-plan) 'need-mount 'false)
+       srcs-str
+       dest-subdir)))
 
-  (define (available-for-backup? dir)
-    (or (excluded? dir) (directory-exists? dir)))
-
-  (let* ([assoc-dirs-out
-          (foldl (lambda (dir mdirs)
-                   (if (available-for-backup? dir) mdirs (cons dir mdirs)))
-                 '()
-                 (cdr src-assoc))])
-    (if (null? assoc-dirs-out)
-        missing-assocs
-        (cons (cons (car src-assoc) assoc-dirs-out) missing-assocs))))
-
-(define unviable-subplans (foldr get-missing-dirs-app-accum '() %srcs-alist))
-(when (not (null? unviable-subplans))
-  (error 'non-viable-plans
-         "The following (plan files) sets aren't available '~a'"
-         unviable-subplans))
-
-;; .............................................................................
-
-(begin
-  (define (writer)
-    (displayln
-     (format
-      #<<HEADER
+  (string-append
+   (format
+    #<<HEADER
 #! /bin/sh
 
 prep_dir(){
@@ -187,18 +170,7 @@ prep_dir(){
    then mountpoint -q "$1" || mount "$1"
    fi
 }~n
-RsyncFlags=(~a)
+RsyncFlags=(~a)~n~n
 HEADER
-      %rsync-flags))
-    (for-each back-it-up! %backup-plans))
-
-  (with-output-to-file "mirror-backup.sh"
-                       writer
-                       #:exists 'replace
-                       #:permissions #o750)
-  (displayln (file->string "mirror-backup.sh") (current-error-port)))
-
-(eprintf
- "# Run the backup script was written to ~amirror-backup.sh to effect the actual backup.\n"
- (current-directory))
-|#
+    %rsync-flags)
+   (apply string-append (map gen-plan-backup backup-plans))))
