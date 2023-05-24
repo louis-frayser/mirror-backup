@@ -14,7 +14,7 @@ clean:
 	@find . ${trash} |cpio -pvdm ${Attic}
 	@find . ${trash}  -delete -printf "DELE %p"
 
-run mirror-backup.sh: 
+run mirror-backup.sh: *.rkt
 	racket mirror-backup.rkt
 
 test:   mirror-backup.sh

@@ -35,34 +35,8 @@
      #:crysrvs (dir-with-submounts "/volumes/crypt/the_crypt"))))
 
 ;; .............................................................................
-#;(define (back-it-up! a-plan)
-  (let* ([fn (if (backup-plan-merge-on-target? a-plan)
-                 (lambda (p) (string-append p "/"))
-                 (lambda (p) p))]
-         [srcs-str (strings->string (map fn (backup-plan-src-paths a-plan)))]
-         [dest-dir "/volumes/arc/mirror"]
-         [dest-subdir
-          (string-append dest-dir "/" (backup-plan-name a-plan) "/")])
-    (printf
-     #<<JCL
-
-if prep_dir  ~s  ~s
-then rsync "${RsyncFlags[@]}" ~a ~a
-fi
-echo~n
-JCL
-     dest-subdir
-     (if (backup-plan-need-mounted-target? a-plan) 'need-mount 'false)
-     srcs-str
-     dest-subdir)))
-
-(define (back-it-up! a-plan) (displayln (gen-plan-backup a-plan)))
-  
+;; a-list of (plan-name . plan-srcs) assocs
 (define %srcs-alist (srcs-alist %backup-plans))
-
-  #;(map (lambda (r) (cons (backup-plan-name r) (backup-plan-src-paths r)))
-       %backup-plans)
-
 ;; .............................................................................
 ;;; Check for dups
 ((lambda ()
@@ -124,6 +98,7 @@ RsyncFlags=(~a)
 HEADER
       %rsync-flags))
     (for-each back-it-up! %backup-plans))
+  (define (back-it-up! a-plan) (displayln (gen-plan-backup a-plan)))
 
   (with-output-to-file "mirror-backup.sh"
     writer

@@ -23,6 +23,7 @@
               "CacheStorage"
               ".cache"
               "ccache"
+              "dvds"
               "tmp"
               "Code Cache"
               ".thumbnails"
