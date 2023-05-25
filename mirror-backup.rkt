@@ -2,20 +2,16 @@
 #lang debug racket
 (require (only-in racket/os gethostname))
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
-                  get-submounts
+                  (get-submounts get-dir-with-submounts)
                   ~0
                   basename
                   tstamp))
-(require (only-in "app-data.rkt"
-                  %excludes
-                  %rsync-exclude-flags
-                  %default-rsync-flags
-                  %rsync-flags
-                  backup-plan
-                  get-backup-plans
-                  srcs-alist
-                  check-for-dup-srcs?
-                  gen-script))
+(require "app-data.rkt"
+         ;; can't use this as the no way to import the "record type"
+         #;(only-in "app-data.rkt" %excludes %rsync-exclude-flags
+                    %default-rsync-flags %rsync-flags srcs-alist check-for-dup-srcs?
+                    gen-script))
+
 ;;; ============================================================================
 ;;; Semantics
 ;;; 1. It's implied that mountoints are not traversed
@@ -26,28 +22,49 @@
 ;;;    this is security for cases requring an encrypting destinatin directory.
 ;;; 5. Sensitive? => log to a encrypted directory.
 (define %backup-plans
-  (let* ([dir-with-submounts get-submounts]
-         [arcsrcs (append (dir-with-submounts "/volumes/arc/archives")
-                          '("/volumes/arc/dskimgs" "/volumes/work"))])
-    (get-backup-plans
-     #:arcsrcs arcsrcs
-     #:expsrcs (dir-with-submounts "/export") ; includes /export/home
-     #:hostname (gethostname)
-     #:srvsrvs (dir-with-submounts "/srv")
-     #:crysrvs (dir-with-submounts "/volumes/crypt/the_crypt"))))
+  ((lambda()
+     (define (decode-plan pln)
+       (define name
+         (let* ((n0 (backup-plan-name pln)))
+           (cond ((eq? n0 'by-host/hostname)
+                  (string-append "by-host/" (gethostname)))
+                 ((string? n0) n0)
+                 (else (error 'type-error
+                              '(format "backup-plan-name was: '~a' sb: string or 'by-hosthostname"
+                                       n0))))))
+       (define decoded-srcs-spec
+         (let ((el->list
+                (lambda(el)
+                  (case (car el)
+                    ((#:all-mounts)
+                     (apply append (map get-dir-with-submounts (cdr el))))
+                    (else el)))))
+           (apply append (map el->list (backup-plan-src-paths pln)))))
+       (define decoded-target-path (case (backup-plan-target-path pln)
+                                     ((default) "/volumes/arc/mirror")
+                                     ((alternate) "/volumes/roots/zzz/mirror")
+                                     (else (error 'bad-symbolic-target "app-data:backup-plans"))))
+       (backup-plan
+        #:name name
+        #:src-paths decoded-srcs-spec
+        #:target-path decoded-target-path
+        #:ignore-paths (backup-plan-ignore-paths pln)
+        #:merge-on-target? (backup-plan-merge-on-target? pln)
+        #:need-mounted-target? (backup-plan-need-mounted-target? pln)))
 
+     (map decode-plan (backup-plans)))))
 ;; .............................................................................
 ;; a-list of (plan-name . plan-srcs) assocs
 (define %srcs-alist (srcs-alist %backup-plans))
 ;; .............................................................................
 ;;; Check for dups
-(let ([dups? (check-for-dup-srcs? %srcs-alist)])
-  (when dups?
-    (error
-     'user-error:backup-plans
-     (format
-      "Each of following plan pairs duplicate some source paths between them: ~s"
-      dups?))))
+(let ([maybe-dups (check-for-dup-srcs? %srcs-alist)])
+  (when maybe-dups
+    (error 'user-error:backup-plans
+           (format
+            "Each of following plan pairs duplicate some\
+ source paths between them: ~s"
+            maybe-dups))))
 ;; .............................................................................
 ;;; Verify that each mentioned path is present
 (define (get-missing-dirs-app-accum src-assoc missing-assocs)
@@ -74,13 +91,14 @@
 ;; .............................................................................
 ;;; Write resultant script to file...
 (with-output-to-file "mirror-backup.sh"
-                     (lambda () (display (gen-script %backup-plans)))
-                     #:exists 'replace
-                     #:permissions #o750)
+  (lambda () (display (gen-script %backup-plans)))
+  #:exists 'replace
+  #:permissions #o750)
 
 ;; Show the result from file...
 (displayln (file->string "mirror-backup.sh") (current-error-port))
 
 (eprintf
- "# Run the backup script that was written to ~amirror-backup.sh to effect the actual backup.\n"
+ "# Run the backup script that was written to ~amirror-backup.sh\
+ to effect the actual backup.\n"
  (current-directory))
