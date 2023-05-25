@@ -9,10 +9,10 @@ default:
 Attic:
 	mkdir -p "$@"
 	
-trash=-name "*~"
+find-common=find . -maxdepth 1 -name  "*~" -print
 clean:
-	@find . ${trash} |cpio -pvdm ${Attic}
-	@find . ${trash}  -delete -printf "DELE %p"
+	@${find-common} |cpio -pvdm ${Attic}
+	@${find-common} -delete -exec echo DELE {} +
 
 run mirror-backup.sh: *.rkt
 	racket mirror-backup.rkt
