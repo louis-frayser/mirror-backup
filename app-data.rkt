@@ -127,7 +127,7 @@
    (backup-plan
     #:name "the_crypt"
     #:ignore-paths '("/volumes/crypt/the_crypt/xv")
-    #:merge-on-target? #f
+    #:merge-on-target? #t
     #:need-mounted-target? #t
     #:src-paths '((#:all-mounts "/volumes/crypt/the_crypt"))
     #:target-path 'default)))
@@ -139,10 +139,6 @@
     ;; Combinations of all Plan records
     (define srcs-pairs (combinations srcs-alist 2))
 
-    #;(define (lsets-intersect? srcs-pr)
-        (let ([sp1 (car srcs-pr)] [sp2 (cadr srcs-pr)])
-          (and (cons? (lset-intersection string=? (cdr sp1) (cdr sp2)))
-               #R  (cons (car sp1) (car sp2))))) ; <- forming the result
     (define (lsets-intersect? srcs-pr)
       ;; Find intersecting source path listes between plan (name . srcs-list) assoctons
       (let* ([sp1 (car srcs-pr)]
