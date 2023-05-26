@@ -4,9 +4,9 @@ This is a backup script generator for backing up my system to external USB drive
 
 ## Introduction
 ### The main task
-1. Allow for declarative description of the backup task
-   by describing which source directives are to backed up
-2. Check for common error.
+1. Allow for declarative description of the backup tasks
+   by describing which source directories are to backed up
+2. Check for common errors.
 3. Generate a shell script to to the job.
 
 ### Other Tasks are
@@ -19,14 +19,15 @@ This is a backup script generator for backing up my system to external USB drive
 ### Running
 1. Edit the configuration (currently the *backup plan* records inside *app-data.rkt*
 2. Run the program 
-   racket mirror-backup.rkt
+   racket *mirror-backup.rkt*
 2.1 That creates the program: *mirror-backup.sh*
 3. Examining the shell script.
 4. Run the script:
-   sh mirror-backup.sh
+>   **sh** *mirror-backup.sh*
 
-5. There is a Makefile in the sources directory.  Running *make test* will
-   generate the shell script and run it.
+5. There is a Makefile in the sources directory.  Running 
+>  **make test** 
+   will generate the shell script and run it.
 
 ### Caveats
 1.Running this script requires superuser privileges.  At least that is the 
