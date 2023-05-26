@@ -1,8 +1,9 @@
 #!/usr/bin/racket
 #lang debug racket
 (require (only-in racket/os gethostname))
+(require (only-in srfi/1 lset-difference))
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
-                  (get-submounts get-dir-with-submounts)
+                  get-submounts
                   ~0
                   basename
                   tstamp))
@@ -11,7 +12,10 @@
          #;(only-in "app-data.rkt" %excludes %rsync-exclude-flags
                     %default-rsync-flags %rsync-flags srcs-alist check-for-dup-srcs?
                     gen-script))
+;;; ============================================================================
 
+(define (get-dir-with-submounts dir)
+  (cons dir (get-submounts dir)))
 ;;; ============================================================================
 ;;; Semantics
 ;;; 1. It's implied that mountoints are not traversed
@@ -32,14 +36,18 @@
                  (else (error 'type-error
                               '(format "backup-plan-name was: '~a' sb: string or 'by-hosthostname"
                                        n0))))))
+       (define local-excludes (backup-plan-ignore-paths pln))
+       
        (define decoded-srcs-spec
-         (let ((el->list
-                (lambda(el)
-                  (case (car el)
-                    ((#:all-mounts)
-                     (apply append (map get-dir-with-submounts (cdr el))))
-                    (else el)))))
-           (apply append (map el->list (backup-plan-src-paths pln)))))
+         (let* ((el->list
+                 (lambda(el)
+                   (case (car el)
+                     ((#:all-mounts)
+                      (apply append (map get-dir-with-submounts (cdr el))))
+                     (else el))))
+                (initial-paths (apply append (map el->list (backup-plan-src-paths pln)))))
+           (lset-difference string=? initial-paths local-excludes)))
+
        (define decoded-target-path (case (backup-plan-target-path pln)
                                      ((default) "/volumes/arc/mirror")
                                      ((alternate) "/volumes/roots/zzz/mirror")
@@ -48,7 +56,7 @@
         #:name name
         #:src-paths decoded-srcs-spec
         #:target-path decoded-target-path
-        #:ignore-paths (backup-plan-ignore-paths pln)
+        #:ignore-paths local-excludes 
         #:merge-on-target? (backup-plan-merge-on-target? pln)
         #:need-mounted-target? (backup-plan-need-mounted-target? pln)))
 
@@ -62,8 +70,8 @@
   (when maybe-dups
     (error 'user-error:backup-plans
            (format
-            "Each of following plan pairs duplicate some\
- source paths between them: ~s"
+            "Each of following triplicates show two plans and the \
+source paths duplicated between them: ~s"
             maybe-dups))))
 ;; .............................................................................
 ;;; Verify that each mentioned path is present

@@ -10,7 +10,7 @@
          srcs-alist
          check-for-dup-srcs?
          check-for-dup-srcs?)
-(require (only-in srfi/1 lset-intersection))
+(require (only-in srfi/1 lset-intersection lset-difference))
 (require rebellion/type/record)
 (require (only-in "../../dev-scheme/racket-hacks/main.rkt"
                   #;racket-hacks
@@ -118,33 +118,42 @@
     #:src-paths '((#:all-mounts "/srv"))
     #:target-path 'default)
    (backup-plan
+    #:name "the_crypt/xv"
+    #:src-paths '(("/volumes/crypt/the_crypt/xv"))
     #:ignore-paths '()
     #:merge-on-target? #f
-    #:name "the_crypt/xv"
-    #:need-mounted-target? #t
-    #:src-paths '((#:all-mounts "/volumes/crypt/the-crypt/xv"))
+    #:need-mounted-target? #f
     #:target-path 'alternate)
    (backup-plan
-    #:ignore-paths '("the_crypt/xv")
-    #:merge-on-target? #f
     #:name "the_crypt"
+    #:ignore-paths '("/volumes/crypt/the_crypt/xv")
+    #:merge-on-target? #f
     #:need-mounted-target? #t
-    #:src-paths '((#:all-mounts "/volumes/crypt/the-crypt"))
+    #:src-paths '((#:all-mounts "/volumes/crypt/the_crypt"))
     #:target-path 'default)))
 
 ;; .............................................................................
 (define check-for-dup-srcs?
   ;;; Check for dups
   (lambda (srcs-alist)
+    ;; Combinations of all Plan records
     (define srcs-pairs (combinations srcs-alist 2))
-    (define (lsets-intersect? src-pr)
-      (let ([sp1 (car src-pr)] [sp2 (cadr src-pr)])
-        (and (cons? (lset-intersection string=? (cdr sp1) (cdr sp2)))
-             (cons (car sp1) (car sp2)))))
-    (map lsets-intersect? srcs-pairs)
-    (define r (filter lsets-intersect? srcs-pairs))
 
-    (define dups (map (lambda (pr) (map car pr)) r))
+    #;(define (lsets-intersect? srcs-pr)
+        (let ([sp1 (car srcs-pr)] [sp2 (cadr srcs-pr)])
+          (and (cons? (lset-intersection string=? (cdr sp1) (cdr sp2)))
+               #R  (cons (car sp1) (car sp2))))) ; <- forming the result
+    (define (lsets-intersect? srcs-pr)
+      ;; Find intersecting source path listes between plan (name . srcs-list) assoctons
+      (let* ([sp1 (car srcs-pr)]
+             [sp2 (cadr srcs-pr)]
+             (cmp (lset-intersection string=? (cdr sp1) (cdr sp2))))
+        (if (cons? cmp) (list (car sp1) (car sp2) cmp ) #f)))
+
+    ;(define r (filter lsets-intersect? srcs-pairs))
+    (define r (filter identity (map lsets-intersect? srcs-pairs)))
+    ;(define dups (map (lambda (pr) (map car pr))  r))
+    (define dups r)
     (if (pair? dups) dups #f)))
 
 ;; .............................................................................
