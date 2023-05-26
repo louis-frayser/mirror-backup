@@ -17,8 +17,13 @@ clean:
 run mirror-backup.sh: *.rkt
 	racket mirror-backup.rkt
 
+uut=mirror-backup-test.sh
 test:   mirror-backup.sh
-	script -c "sh -x $<" "test.log"
+	cp $< ${uut}
+	script -c "sh -x ${uut}" "test.log"
+
+clobber: clean
+	rm -f ${uut} test.log
 
 format fmt:
 	raco fmt -i --width 78 *.rkt
