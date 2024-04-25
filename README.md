@@ -20,7 +20,7 @@ This is a backup script generator for backing up my system to external USB drive
 1. Edit the configuration (currently the *backup plan* records inside *app-data.rkt*
 2. Run the program 
 >  racket *mirror-backup.rkt*
-2.1. That creates the program: *mirror-backup.sh*
+    2.1. That creates the program: *mirror-backup.sh*
 3. Examining the shell script.
 4. Run the script:
 >   **sh** *mirror-backup.sh*
