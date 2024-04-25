@@ -20,6 +20,7 @@ This is a backup script generator for backing up my system to external USB drive
 1. Edit the configuration (currently the *backup plan* records inside *app-data.rkt*
 2. Run the program 
 >  racket *mirror-backup.rkt*
+
     2.1 That creates the program: *mirror-backup.sh*
 3. Examining the shell script.
 4. Run the script:
@@ -35,6 +36,8 @@ will generate the shell script and run it.
    target paths.
 2. Some knowledge of Scheme could be helpful.  It is easy for a non Schemer
    to hose things up.
+3. Requires Racket pagkage "Rebellion": 
+> raco install -i --auto rebellion
    
 ### Dreams
 Eventually, the configuration my be separated from the source code and
