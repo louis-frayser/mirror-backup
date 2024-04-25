@@ -12,13 +12,10 @@
          #;(only-in "app-data.rkt" %excludes %rsync-exclude-flags
                     %default-rsync-flags %rsync-flags srcs-alist check-for-dup-srcs?
                     gen-script))
-;;; ============================================================================
 
-(define (get-dir-with-submounts dir)
-  (cons dir (get-submounts dir)))
 ;;; ============================================================================
 ;;; Semantics
-;;; 1. It's implied that mountoints are not traversed
+;;; 1. It's implied that mountpoints are not traversed
 ;;; 2. The #:name is use to create a top-level directory in the destination
 ;;; 3. Merge-on-target? means target name is basename on backp; so
 ;;;    srcs: a/b/c d/e/f becore target/b/c and target/e/f
@@ -43,7 +40,7 @@
                  (lambda(el)
                    (case (car el)
                      ((#:all-mounts)
-                      (apply append (map get-dir-with-submounts (cdr el))))
+                      (apply append (map get-submounts (cdr el))))
                      (else el))))
                 (initial-paths (apply append (map el->list (backup-plan-src-paths pln)))))
            (lset-difference string=? initial-paths local-excludes)))
